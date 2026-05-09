@@ -1,37 +1,48 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from html import escape
 from typing import Iterable, List
 
 from app.db.repo.models import ChapterView, ItemView
 
 
-def render_notes(chapters: Iterable[ChapterView]) -> str:
+@dataclass(frozen=True)
+class RenderSection:
+    key: str
+    text: str
+
+
+def render_sections(chapters: Iterable[ChapterView]) -> List[RenderSection]:
     chapter_list = list(chapters)
     if not chapter_list:
-        return "<b>Notes</b>\n\nNo notes yet."
+        return [RenderSection(key="empty", text="No notes")]
 
-    lines: List[str] = ["<b>Notes</b>", ""]
+    sections: List[RenderSection] = []
     for chapter in chapter_list:
-        _render_chapter(lines, chapter, prefix="", indent="")
-        lines.append("")
-    return "\n".join(lines).strip()
+        lines: List[str] = []
+        _render_chapter(lines, chapter, indent="")
+        section_key = "inbox" if chapter.is_inbox else f"chapter:{chapter.id}"
+        sections.append(RenderSection(key=section_key, text="\n".join(lines).strip()))
+    return sections
 
 
-def _render_chapter(lines: List[str], chapter: ChapterView, prefix: str, indent: str) -> None:
+def render_notes(chapters: Iterable[ChapterView]) -> str:
+    return "\n\n".join(section.text for section in render_sections(chapters))
+
+
+def _render_chapter(lines: List[str], chapter: ChapterView, indent: str) -> None:
     title = escape(chapter.title)
     if chapter.is_inbox:
         lines.append(f"{indent}<b>{title}</b>")
     else:
-        current_prefix = str(chapter.display_index) if not prefix else f"{prefix}.{chapter.display_index}"
-        lines.append(f"{indent}<b>{current_prefix}. {title}</b>")
-        prefix = current_prefix
+        lines.append(f"{indent}<b>{chapter.display_index}. {title}</b>")
 
     for item in chapter.items:
         lines.append(_render_item(item, indent + "  "))
 
     for child in chapter.children:
-        _render_chapter(lines, child, prefix=prefix, indent=indent + "  ")
+        _render_chapter(lines, child, indent=indent + "  ")
 
 
 def _render_item(item: ItemView, indent: str) -> str:
@@ -40,4 +51,3 @@ def _render_item(item: ItemView, indent: str) -> str:
     if item.is_done:
         value = f"<s>{value}</s>"
     return f"{indent}{value}"
-

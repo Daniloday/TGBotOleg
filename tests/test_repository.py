@@ -65,6 +65,52 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
             (3, "Milk", True),
         ])
 
+    async def test_inbox_done_and_delete_use_zero_chapter_index(self) -> None:
+        await self.repo.add_inbox_item(self.user_id, "One")
+        await self.repo.add_inbox_item(self.user_id, "Two")
+
+        await self.repo.mark_done(self.user_id, (), 2)
+        snapshot = await self.repo.get_snapshot(self.user_id)
+        self.assertEqual([(item.text, item.is_done) for item in snapshot[0].items], [("One", False), ("Two", True)])
+
+        await self.repo.delete_by_path(self.user_id, (0, 1))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+        self.assertEqual([(item.display_index, item.text) for item in snapshot[0].items], [(1, "Two")])
+
+    async def test_creating_subchapter_moves_parent_items_into_it(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        await self.repo.add_item(self.user_id, (1,), "Milk")
+        await self.repo.add_item(self.user_id, (1,), "Bread")
+
+        await self.repo.create_chapter(self.user_id, "Food", (1,))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertEqual(snapshot[0].items, [])
+        self.assertEqual(snapshot[0].children[0].title, "Food")
+        self.assertEqual([item.text for item in snapshot[0].children[0].items], ["Milk", "Bread"])
+
+    async def test_cannot_add_direct_item_to_chapter_with_children(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        await self.repo.create_chapter(self.user_id, "Food", (1,))
+
+        item_id = await self.repo.add_item(self.user_id, (1,), "Milk")
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertIsNone(item_id)
+        self.assertEqual(snapshot[0].items, [])
+        self.assertEqual(snapshot[0].children[0].items, [])
+
+    async def test_undo_subchapter_creation_restores_moved_items(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        await self.repo.add_item(self.user_id, (1,), "Milk")
+
+        await self.repo.create_chapter(self.user_id, "Food", (1,))
+        await self.repo.undo_last(self.user_id)
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertEqual(snapshot[0].children, [])
+        self.assertEqual([item.text for item in snapshot[0].items], ["Milk"])
+
     async def test_undo_create_item_restores_empty_chapter(self) -> None:
         await self.repo.create_chapter(self.user_id, "Buy")
         await self.repo.add_item(self.user_id, (1,), "Milk")

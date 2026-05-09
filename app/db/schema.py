@@ -33,9 +33,10 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE TABLE IF NOT EXISTS render_state (
     telegram_user_id INTEGER NOT NULL,
     chat_id INTEGER NOT NULL,
+    section_key TEXT NOT NULL,
     message_id INTEGER NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (telegram_user_id, chat_id),
+    PRIMARY KEY (telegram_user_id, chat_id, section_key),
     FOREIGN KEY (telegram_user_id) REFERENCES users (telegram_user_id) ON DELETE CASCADE
 );
 
@@ -57,4 +58,3 @@ CREATE INDEX IF NOT EXISTS idx_items_chapter_done_position
 CREATE INDEX IF NOT EXISTS idx_history_user_id
     ON operation_history (telegram_user_id, id);
 """
-

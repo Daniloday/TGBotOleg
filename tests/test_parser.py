@@ -26,6 +26,13 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(action.path, (7,))
         self.assertEqual(action.item_index, 2)
 
+    def test_dash_done_inbox_action(self) -> None:
+        action = parse_user_text("- 2")
+
+        self.assertEqual(action.kind, MARK_DONE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_index, 2)
+
     def test_bullet_done_action(self) -> None:
         action = parse_user_text("• 7 2")
 
@@ -38,6 +45,12 @@ class ParserTest(unittest.TestCase):
 
         self.assertEqual(action.kind, DELETE)
         self.assertEqual(action.path, (7, 2))
+
+    def test_del_inbox_action(self) -> None:
+        action = parse_user_text("/del 0 1")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, (0, 1))
 
     def test_create_top_chapter(self) -> None:
         action = parse_user_text("+ Buy")
@@ -82,4 +95,3 @@ class ParserTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

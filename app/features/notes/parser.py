@@ -14,7 +14,7 @@ from app.features.notes.actions import (
     NoteAction,
 )
 
-DONE_RE = re.compile(r"^[-•]\s+\d+(?:\s+\d+){1,2}$")
+DONE_RE = re.compile(r"^[-•]\s+\d+(?:\s+\d+){0,2}$")
 CREATE_RE = re.compile(r"^\+\s+(?:(\d+)\s+)?(.+)$")
 ADD_RE = re.compile(r"^(\d+)(?:\s+(\d+))?\s+(.+)$")
 DELETE_RE = re.compile(r"^/del\s+(\d+(?:\s+\d+){0,2})\s*$")
@@ -42,6 +42,8 @@ def parse_user_text(raw_text: str) -> NoteAction:
 
     if DONE_RE.match(text):
         numbers = _parse_path(text[1:].strip())
+        if len(numbers) == 1:
+            return NoteAction(kind=MARK_DONE, path=(), item_index=numbers[0])
         return NoteAction(kind=MARK_DONE, path=numbers[:-1], item_index=numbers[-1])
 
     match = CREATE_RE.match(text)
@@ -62,4 +64,3 @@ def parse_user_text(raw_text: str) -> NoteAction:
 
 def _parse_path(value: str) -> tuple[int, ...]:
     return tuple(int(part) for part in value.split())
-

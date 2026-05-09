@@ -74,11 +74,14 @@ class NotesRepository:
                 """,
                 (chapter_id, telegram_user_id, parent_id, title.strip(), position),
             )
+            moved_items: List[Dict[str, Any]] = []
+            if parent_id is not None:
+                moved_items = await self._move_direct_items_to_child(conn, parent_id, chapter_id)
             await self._record_history(
                 conn,
                 telegram_user_id,
                 "create_chapter",
-                {"chapter_id": chapter_id},
+                {"chapter_id": chapter_id, "moved_items": moved_items},
             )
             await conn.commit()
             return chapter_id
@@ -92,6 +95,9 @@ class NotesRepository:
             await self._ensure_user(conn, telegram_user_id)
             chapter = await self._resolve_chapter_path(conn, telegram_user_id, chapter_path)
             if chapter is None:
+                await conn.rollback()
+                return None
+            if await self._has_children(conn, telegram_user_id, chapter["id"]):
                 await conn.rollback()
                 return None
             item_id = await self._insert_item(conn, chapter["id"], text.strip())
@@ -127,7 +133,7 @@ class NotesRepository:
         conn = self.database.require_connection()
         try:
             await self._ensure_user(conn, telegram_user_id)
-            chapter = await self._resolve_chapter_path(conn, telegram_user_id, chapter_path)
+            chapter = await self._resolve_item_chapter_path(conn, telegram_user_id, chapter_path)
             if chapter is None:
                 await conn.rollback()
                 return False
@@ -250,30 +256,47 @@ class NotesRepository:
             await conn.rollback()
             raise
 
-    async def get_render_message_id(self, telegram_user_id: int, chat_id: int) -> Optional[int]:
+    async def get_render_messages(self, telegram_user_id: int, chat_id: int) -> Dict[str, int]:
         conn = self.database.require_connection()
-        row = await self._fetchone(
+        rows = await self._fetchall(
             conn,
             """
-            SELECT message_id
+            SELECT section_key, message_id
             FROM render_state
             WHERE telegram_user_id = ? AND chat_id = ?
             """,
             (telegram_user_id, chat_id),
         )
-        return None if row is None else int(row["message_id"])
+        return {row["section_key"]: int(row["message_id"]) for row in rows}
 
-    async def set_render_message_id(self, telegram_user_id: int, chat_id: int, message_id: int) -> None:
+    async def set_render_message_id(
+        self,
+        telegram_user_id: int,
+        chat_id: int,
+        section_key: str,
+        message_id: int,
+    ) -> None:
         conn = self.database.require_connection()
         await self._ensure_user(conn, telegram_user_id)
         await conn.execute(
             """
-            INSERT INTO render_state (telegram_user_id, chat_id, message_id, updated_at)
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(telegram_user_id, chat_id)
+            INSERT INTO render_state (telegram_user_id, chat_id, section_key, message_id, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(telegram_user_id, chat_id, section_key)
             DO UPDATE SET message_id = excluded.message_id, updated_at = CURRENT_TIMESTAMP
             """,
-            (telegram_user_id, chat_id, message_id),
+            (telegram_user_id, chat_id, section_key, message_id),
+        )
+        await conn.commit()
+
+    async def delete_render_message_id(self, telegram_user_id: int, chat_id: int, section_key: str) -> None:
+        conn = self.database.require_connection()
+        await conn.execute(
+            """
+            DELETE FROM render_state
+            WHERE telegram_user_id = ? AND chat_id = ? AND section_key = ?
+            """,
+            (telegram_user_id, chat_id, section_key),
         )
         await conn.commit()
 
@@ -303,6 +326,42 @@ class NotesRepository:
             (item_id, chapter_id, text, position),
         )
         return item_id
+
+    async def _move_direct_items_to_child(
+        self,
+        conn: aiosqlite.Connection,
+        parent_id: str,
+        child_id: str,
+    ) -> List[Dict[str, Any]]:
+        rows = await self._fetchall(
+            conn,
+            """
+            SELECT *
+            FROM items
+            WHERE chapter_id = ?
+            ORDER BY is_done ASC, position ASC, created_at ASC
+            """,
+            (parent_id,),
+        )
+        moved_items = [self._row_to_dict(row) for row in rows]
+        active_position = 1
+        done_position = 1
+        for row in rows:
+            if bool(row["is_done"]):
+                position = done_position
+                done_position += 1
+            else:
+                position = active_position
+                active_position += 1
+            await conn.execute(
+                """
+                UPDATE items
+                SET chapter_id = ?, position = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (child_id, position, row["id"]),
+            )
+        return moved_items
 
     async def _build_chapter_view(
         self,
@@ -408,6 +467,34 @@ class NotesRepository:
         child_rows = await self._get_children(conn, telegram_user_id, current["id"])
         return self._by_display_index(child_rows, path[1])
 
+    async def _resolve_item_chapter_path(
+        self,
+        conn: aiosqlite.Connection,
+        telegram_user_id: int,
+        path: Sequence[int],
+    ) -> Optional[aiosqlite.Row]:
+        if len(path) == 0:
+            return await self._get_inbox(conn, telegram_user_id)
+        return await self._resolve_chapter_path(conn, telegram_user_id, path)
+
+    async def _has_children(
+        self,
+        conn: aiosqlite.Connection,
+        telegram_user_id: int,
+        chapter_id: str,
+    ) -> bool:
+        row = await self._fetchone(
+            conn,
+            """
+            SELECT 1
+            FROM chapters
+            WHERE telegram_user_id = ? AND parent_id = ? AND is_inbox = 0
+            LIMIT 1
+            """,
+            (telegram_user_id, chapter_id),
+        )
+        return row is not None
+
     async def _resolve_item_index(
         self,
         conn: aiosqlite.Connection,
@@ -432,6 +519,13 @@ class NotesRepository:
         telegram_user_id: int,
         path: Sequence[int],
     ) -> Optional[Tuple[str, aiosqlite.Row]]:
+        if len(path) == 2 and path[0] == 0:
+            inbox = await self._get_inbox(conn, telegram_user_id)
+            if inbox is None:
+                return None
+            item = await self._resolve_item_index(conn, inbox["id"], path[1])
+            return None if item is None else ("item", item)
+
         if len(path) == 1:
             chapter = await self._resolve_chapter_path(conn, telegram_user_id, path)
             return None if chapter is None else ("chapter", chapter)
@@ -566,6 +660,7 @@ class NotesRepository:
                 (payload["chapter_id"],),
             )
             if row is not None:
+                await self._restore_moved_items(conn, payload.get("moved_items", []))
                 await conn.execute("DELETE FROM chapters WHERE id = ?", (row["id"],))
                 await self._remove_chapter_position(conn, row["telegram_user_id"], row["parent_id"], row["position"])
             return
@@ -622,6 +717,17 @@ class NotesRepository:
                 item["updated_at"],
             ),
         )
+
+    async def _restore_moved_items(self, conn: aiosqlite.Connection, items: List[Dict[str, Any]]) -> None:
+        for item in items:
+            await conn.execute(
+                """
+                UPDATE items
+                SET chapter_id = ?, position = ?, is_done = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (item["chapter_id"], item["position"], item["is_done"], item["id"]),
+            )
 
     async def _undo_done_item(self, conn: aiosqlite.Connection, payload: Dict[str, Any]) -> None:
         current = await self._fetchone(conn, "SELECT * FROM items WHERE id = ?", (payload["item_id"],))

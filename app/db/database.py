@@ -23,6 +23,7 @@ class Database:
     async def init_schema(self) -> None:
         if self.connection is None:
             raise RuntimeError("Database is not connected.")
+        await self._migrate_render_state()
         await self.connection.executescript(SCHEMA_SQL)
         await self.connection.commit()
 
@@ -36,3 +37,18 @@ class Database:
             raise RuntimeError("Database is not connected.")
         return self.connection
 
+    async def _migrate_render_state(self) -> None:
+        if self.connection is None:
+            raise RuntimeError("Database is not connected.")
+
+        async with self.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'render_state'"
+        ) as cursor:
+            exists = await cursor.fetchone()
+        if exists is None:
+            return
+
+        async with self.connection.execute("PRAGMA table_info(render_state)") as cursor:
+            columns = [row[1] for row in await cursor.fetchall()]
+        if "section_key" not in columns:
+            await self.connection.execute("DROP TABLE render_state")
