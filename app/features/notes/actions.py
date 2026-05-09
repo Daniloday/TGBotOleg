@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
+
+SHOW = "show"
+CREATE_CHAPTER = "create_chapter"
+ADD_ITEM = "add_item"
+ADD_INBOX_ITEM = "add_inbox_item"
+MARK_DONE = "mark_done"
+DELETE = "delete"
+RENAME = "rename"
+UNDO = "undo"
+
+
+@dataclass(frozen=True)
+class NoteAction:
+    kind: str
+    text: Optional[str] = None
+    path: Tuple[int, ...] = ()
+    item_index: Optional[int] = None
+
