@@ -32,12 +32,3 @@
   4. Push the tag:
      `git push origin v1.2.0`
 - The GitHub Action runs on `v*` tags and verifies that the tagged commit belongs to `origin/prod` before deploying.
-
-## Style + Rules
-- Answer in Russian unless asked otherwise.
-- Be blunt and practical. No fluff.
-- Write code as a senior engineer: clean, minimal, best practices.
-- Prefer small, reviewable diffs.
-- Before editing many files: propose a plan and list touched files.
-- Don't add new dependencies unless explicitly needed.
-- If unsure: ask 1 targeted question or make a reasonable assumption and state it.
