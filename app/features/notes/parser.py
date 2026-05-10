@@ -7,6 +7,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
     MARK_DONE,
@@ -24,6 +25,7 @@ ADD_RE = re.compile(r"^(\d+)(?:\s+(\d+))?\s+(.+)$")
 DELETE_RE = re.compile(r"^[-•]\s+(.+)$")
 DONE_RE = re.compile(r"^\d+(?:-\d+)?(?:\s+\d+(?:-\d+)?){0,2}$")
 MOVE_RE = re.compile(r"^/(up|down)\s+(\d+(?:\s+\d+){0,2})\s*$")
+RM_RE = re.compile(r"^/rm\s+(\d+(?:\s+\d+)?)\s*$")
 RENAME_RE = re.compile(r"^/rename\s+(\d+(?:\s+\d+)?)\s+(.+)$")
 PUSHDEL_RE = re.compile(r"^/pushdel\s+(\d+)\s*$")
 
@@ -50,6 +52,10 @@ def parse_user_text(raw_text: str) -> NoteAction:
     if match:
         kind = MOVE_UP if match.group(1) == "up" else MOVE_DOWN
         return NoteAction(kind=kind, path=_parse_path(match.group(2)))
+
+    match = RM_RE.match(text)
+    if match:
+        return NoteAction(kind=DELETE_CHAPTER, path=_parse_path(match.group(1)))
 
     match = DELETE_RE.match(text)
     if match:

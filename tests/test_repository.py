@@ -41,6 +41,33 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([(chapter.display_index, chapter.title) for chapter in snapshot], [(1, "One"), (2, "Three")])
 
+    async def test_delete_chapter_by_path_deletes_only_chapters(self) -> None:
+        await self.repo.create_chapter(self.user_id, "One")
+        await self.repo.add_item(self.user_id, (1,), "Milk")
+
+        deleted = await self.repo.delete_chapter_by_path(self.user_id, (1, 1))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertFalse(deleted)
+        self.assertEqual(snapshot[0].title, "One")
+        self.assertEqual(snapshot[0].items[0].text, "Milk")
+
+    async def test_delete_subchapter_by_path_and_undo(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        await self.repo.create_chapter(self.user_id, "Food", (1,))
+        await self.repo.add_item(self.user_id, (1, 1), "Milk")
+
+        deleted = await self.repo.delete_chapter_by_path(self.user_id, (1, 1))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertTrue(deleted)
+        self.assertEqual(snapshot[0].children, [])
+
+        await self.repo.undo_last(self.user_id)
+        snapshot = await self.repo.get_snapshot(self.user_id)
+        self.assertEqual(snapshot[0].children[0].title, "Food")
+        self.assertEqual(snapshot[0].children[0].items[0].text, "Milk")
+
     async def test_users_do_not_see_each_other_data(self) -> None:
         await self.repo.create_chapter(self.user_id, "Mine")
         await self.repo.create_chapter(2002, "Other")

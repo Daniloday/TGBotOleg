@@ -4,6 +4,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
     MARK_DONE,
@@ -83,6 +84,18 @@ class ParserTest(unittest.TestCase):
         action = parse_user_text("/del 7 2")
 
         self.assertEqual(action.kind, ADD_INBOX_ITEM)
+
+    def test_remove_chapter_command(self) -> None:
+        action = parse_user_text("/rm 7")
+
+        self.assertEqual(action.kind, DELETE_CHAPTER)
+        self.assertEqual(action.path, (7,))
+
+    def test_remove_subchapter_command(self) -> None:
+        action = parse_user_text("/rm 7 2")
+
+        self.assertEqual(action.kind, DELETE_CHAPTER)
+        self.assertEqual(action.path, (7, 2))
 
     def test_move_up_and_down(self) -> None:
         up = parse_user_text("/up 7 2")

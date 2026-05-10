@@ -240,6 +240,30 @@ class NotesRepository:
             await conn.rollback()
             raise
 
+    async def delete_chapter_by_path(self, telegram_user_id: int, path: Sequence[int]) -> bool:
+        conn = self.database.require_connection()
+        try:
+            await self._ensure_user(conn, telegram_user_id)
+            chapter = await self._resolve_chapter_path(conn, telegram_user_id, path)
+            if chapter is None or bool(chapter["is_inbox"]):
+                await conn.rollback()
+                return False
+
+            payload = {"chapter": await self._serialize_chapter_tree(conn, chapter["id"])}
+            await conn.execute("DELETE FROM chapters WHERE id = ?", (chapter["id"],))
+            await self._remove_chapter_position(
+                conn,
+                telegram_user_id,
+                chapter["parent_id"],
+                chapter["position"],
+            )
+            await self._record_history(conn, telegram_user_id, "delete_chapter", payload)
+            await conn.commit()
+            return True
+        except Exception:
+            await conn.rollback()
+            raise
+
     async def delete_by_path(self, telegram_user_id: int, path: Sequence[int]) -> bool:
         conn = self.database.require_connection()
         try:

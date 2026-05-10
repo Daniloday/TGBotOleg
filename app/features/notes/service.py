@@ -5,6 +5,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
     MARK_DONE,
@@ -49,6 +50,10 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
 
     if action.kind == DELETE and action.item_indexes:
         await repo.delete_items(telegram_user_id, action.path, action.item_indexes)
+        return
+
+    if action.kind == DELETE_CHAPTER:
+        await repo.delete_chapter_by_path(telegram_user_id, action.path)
         return
 
     if action.kind in {MOVE_UP, MOVE_DOWN}:
