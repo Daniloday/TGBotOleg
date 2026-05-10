@@ -141,6 +141,17 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
         items = (await self.repo.get_snapshot(self.user_id))[0].items
         self.assertEqual([item.text for item in items], ["One", "Two", "Three", "Four"])
 
+    async def test_bulk_add_inbox_items_and_undo_as_one_action(self) -> None:
+        item_ids = await self.repo.add_inbox_items(self.user_id, ("Books", "Notebooks"))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertEqual(len(item_ids), 2)
+        self.assertEqual([item.text for item in snapshot[0].items], ["Books", "Notebooks"])
+
+        await self.repo.undo_last(self.user_id)
+        snapshot = await self.repo.get_snapshot(self.user_id)
+        self.assertEqual(snapshot, [])
+
     async def test_move_chapter_and_item_to_edges(self) -> None:
         await self.repo.create_chapter(self.user_id, "One")
         await self.repo.create_chapter(self.user_id, "Two")

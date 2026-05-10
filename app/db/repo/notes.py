@@ -140,17 +140,31 @@ class NotesRepository:
             raise
 
     async def add_inbox_item(self, telegram_user_id: int, text: str) -> Optional[str]:
+        item_ids = await self.add_inbox_items(telegram_user_id, (text,))
+        if not item_ids:
+            return None
+        return item_ids[0]
+
+    async def add_inbox_items(self, telegram_user_id: int, texts: Sequence[str]) -> List[str]:
         conn = self.database.require_connection()
         try:
+            clean_texts = [text.strip() for text in texts if text.strip()]
+            if not clean_texts:
+                await conn.rollback()
+                return []
             await self._ensure_user(conn, telegram_user_id)
             inbox = await self._get_inbox(conn, telegram_user_id)
             if inbox is None:
                 await conn.rollback()
-                return None
-            item_id = await self._insert_item(conn, inbox["id"], text.strip())
-            await self._record_history(conn, telegram_user_id, "create_item", {"item_id": item_id})
+                return []
+            item_ids = []
+            for text in clean_texts:
+                item_ids.append(await self._insert_item(conn, inbox["id"], text))
+            action_type = "create_item" if len(item_ids) == 1 else "bulk_create_items"
+            payload = {"item_id": item_ids[0]} if len(item_ids) == 1 else {"item_ids": item_ids}
+            await self._record_history(conn, telegram_user_id, action_type, payload)
             await conn.commit()
-            return item_id
+            return item_ids
         except Exception:
             await conn.rollback()
             raise

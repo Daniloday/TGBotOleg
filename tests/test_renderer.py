@@ -40,7 +40,7 @@ class RendererTest(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(sections[0].text, "<b>Buy (1)</b>\n  <b>Food (1)</b>\n    1. Milk")
+        self.assertEqual(sections[0].text, "<b>Buy (1)</b>\n\n  <b>Food (1)</b>\n    1. Milk")
 
 
 if __name__ == "__main__":

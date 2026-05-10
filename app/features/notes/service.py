@@ -41,7 +41,7 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
         return
 
     if action.kind == ADD_INBOX_ITEM and action.text:
-        await repo.add_inbox_item(telegram_user_id, action.text)
+        await repo.add_inbox_items(telegram_user_id, _split_item_lines(action.text))
         return
 
     if action.kind == MARK_DONE and action.item_indexes:

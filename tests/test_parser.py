@@ -24,6 +24,12 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(action.kind, ADD_INBOX_ITEM)
         self.assertEqual(action.text, "-2 kg per week")
 
+    def test_multiline_without_path_is_plain_inbox_note(self) -> None:
+        action = parse_user_text("Books\nNotebooks")
+
+        self.assertEqual(action.kind, ADD_INBOX_ITEM)
+        self.assertEqual(action.text, "Books\nNotebooks")
+
     def test_plain_number_marks_inbox_item_done(self) -> None:
         action = parse_user_text("6")
 

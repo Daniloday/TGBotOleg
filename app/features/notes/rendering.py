@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiogram import Bot
@@ -9,9 +10,21 @@ from app.db.repo.notes import NotesRepository
 from app.features.notes.renderer import RenderSection, render_sections
 
 logger = logging.getLogger(__name__)
+_RENDER_LOCKS: dict[tuple[int, int], asyncio.Lock] = {}
 
 
 async def render_current_state(
+    bot: Bot,
+    repo: NotesRepository,
+    telegram_user_id: int,
+    chat_id: int,
+) -> None:
+    lock = _get_render_lock(telegram_user_id, chat_id)
+    async with lock:
+        await _render_current_state_unlocked(bot, repo, telegram_user_id, chat_id)
+
+
+async def _render_current_state_unlocked(
     bot: Bot,
     repo: NotesRepository,
     telegram_user_id: int,
@@ -31,6 +44,15 @@ async def render_current_state(
 
     for section in sections:
         await _send_section(bot, repo, telegram_user_id, chat_id, section)
+
+
+def _get_render_lock(telegram_user_id: int, chat_id: int) -> asyncio.Lock:
+    key = (telegram_user_id, chat_id)
+    lock = _RENDER_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _RENDER_LOCKS[key] = lock
+    return lock
 
 
 def _can_edit_in_place(sections: list[RenderSection], old_messages: dict[str, int]) -> bool:
