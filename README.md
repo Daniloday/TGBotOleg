@@ -1,8 +1,8 @@
-# Oleg Tododo Bot
+# Oleg Todo Bot
 
 [![Telegram](https://img.shields.io/badge/Telegram-@oleg__tododo__bot-26A5E4?logo=telegram&logoColor=white)](https://t.me/oleg_tododo_bot)
 
-Oleg Tododo Bot is a private Telegram todo bot for fast personal notes, nested chapters, inbox capture, bulk commands, and timed reminders.
+Oleg Todo Bot is a private Telegram todo bot for fast personal notes, nested chapters, inbox capture, bulk commands, and timed reminders.
 
 This project was fully written with OpenAI Codex.
 
