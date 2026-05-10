@@ -7,6 +7,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_PUSH,
     DELETE,
     MARK_DONE,
     MOVE_DOWN,
@@ -24,6 +25,7 @@ DELETE_RE = re.compile(r"^[-•]\s+(.+)$")
 DONE_RE = re.compile(r"^\d+(?:-\d+)?(?:\s+\d+(?:-\d+)?){0,2}$")
 MOVE_RE = re.compile(r"^/(up|down)\s+(\d+(?:\s+\d+){0,2})\s*$")
 RENAME_RE = re.compile(r"^/rename\s+(\d+(?:\s+\d+)?)\s+(.+)$")
+PUSHDEL_RE = re.compile(r"^/pushdel\s+(\d+)\s*$")
 
 
 def parse_user_text(raw_text: str) -> NoteAction:
@@ -40,6 +42,10 @@ def parse_user_text(raw_text: str) -> NoteAction:
     if text == "/push":
         return NoteAction(kind=SHOW_PUSHES)
 
+    match = PUSHDEL_RE.match(text)
+    if match:
+        return NoteAction(kind=DELETE_PUSH, item_index=int(match.group(1)))
+
     match = MOVE_RE.match(text)
     if match:
         kind = MOVE_UP if match.group(1) == "up" else MOVE_DOWN
@@ -55,6 +61,11 @@ def parse_user_text(raw_text: str) -> NoteAction:
     match = RENAME_RE.match(text)
     if match:
         return NoteAction(kind=RENAME, path=_parse_path(match.group(1)), text=match.group(2).strip())
+
+    multiline_add = _parse_multiline_add(text)
+    if multiline_add is not None:
+        path, item_text = multiline_add
+        return NoteAction(kind=ADD_ITEM, path=path, text=item_text)
 
     if DONE_RE.match(text):
         parsed = _parse_item_address(text)
@@ -115,3 +126,28 @@ def _parse_index_part(value: str) -> tuple[int, ...]:
     if start < 1 or end < start:
         raise ValueError("Invalid index range.")
     return tuple(range(start, end + 1))
+
+
+def _parse_multiline_add(value: str) -> Optional[tuple[tuple[int, ...], str]]:
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+
+    first_parts = lines[0].split(maxsplit=2)
+    if not first_parts or not first_parts[0].isdigit():
+        return None
+
+    if len(first_parts) >= 2 and first_parts[1].isdigit():
+        path = (int(first_parts[0]), int(first_parts[1]))
+        first_item = first_parts[2].strip() if len(first_parts) == 3 else ""
+    else:
+        path = (int(first_parts[0]),)
+        first_item = lines[0][len(first_parts[0]):].strip()
+
+    item_lines = []
+    if first_item:
+        item_lines.append(first_item)
+    item_lines.extend(lines[1:])
+    if not item_lines:
+        return None
+    return path, "\n".join(item_lines)

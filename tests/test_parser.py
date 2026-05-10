@@ -4,6 +4,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_PUSH,
     DELETE,
     MARK_DONE,
     MOVE_DOWN,
@@ -97,6 +98,12 @@ class ParserTest(unittest.TestCase):
 
         self.assertEqual(action.kind, SHOW_PUSHES)
 
+    def test_delete_push_by_display_index(self) -> None:
+        action = parse_user_text("/pushdel 5")
+
+        self.assertEqual(action.kind, DELETE_PUSH)
+        self.assertEqual(action.item_index, 5)
+
     def test_create_top_chapter(self) -> None:
         action = parse_user_text("+ Buy")
 
@@ -124,6 +131,27 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(action.kind, ADD_ITEM)
         self.assertEqual(action.path, (3, 1))
         self.assertEqual(action.text, "Pills")
+
+    def test_multiline_add_item_with_first_item_on_header_line(self) -> None:
+        action = parse_user_text("3 Books\nNotebooks")
+
+        self.assertEqual(action.kind, ADD_ITEM)
+        self.assertEqual(action.path, (3,))
+        self.assertEqual(action.text, "Books\nNotebooks")
+
+    def test_multiline_add_item_with_path_on_own_line(self) -> None:
+        action = parse_user_text("3\nBooks\nNotebooks")
+
+        self.assertEqual(action.kind, ADD_ITEM)
+        self.assertEqual(action.path, (3,))
+        self.assertEqual(action.text, "Books\nNotebooks")
+
+    def test_multiline_add_item_to_subchapter(self) -> None:
+        action = parse_user_text("3 1\nBooks\nNotebooks")
+
+        self.assertEqual(action.kind, ADD_ITEM)
+        self.assertEqual(action.path, (3, 1))
+        self.assertEqual(action.text, "Books\nNotebooks")
 
     def test_rename_subchapter(self) -> None:
         action = parse_user_text("/rename 3 1 NewBuy")

@@ -102,20 +102,39 @@ class NotesRepository:
             raise
 
     async def add_item(self, telegram_user_id: int, chapter_path: Sequence[int], text: str) -> Optional[str]:
+        item_ids = await self.add_items(telegram_user_id, chapter_path, (text,))
+        if not item_ids:
+            return None
+        return item_ids[0]
+
+    async def add_items(
+        self,
+        telegram_user_id: int,
+        chapter_path: Sequence[int],
+        texts: Sequence[str],
+    ) -> List[str]:
         conn = self.database.require_connection()
         try:
+            clean_texts = [text.strip() for text in texts if text.strip()]
+            if not clean_texts:
+                await conn.rollback()
+                return []
             await self._ensure_user(conn, telegram_user_id)
             chapter = await self._resolve_chapter_path(conn, telegram_user_id, chapter_path)
             if chapter is None:
                 await conn.rollback()
-                return None
+                return []
             if await self._has_children(conn, telegram_user_id, chapter["id"]):
                 await conn.rollback()
-                return None
-            item_id = await self._insert_item(conn, chapter["id"], text.strip())
-            await self._record_history(conn, telegram_user_id, "create_item", {"item_id": item_id})
+                return []
+            item_ids = []
+            for text in clean_texts:
+                item_ids.append(await self._insert_item(conn, chapter["id"], text))
+            action_type = "create_item" if len(item_ids) == 1 else "bulk_create_items"
+            payload = {"item_id": item_ids[0]} if len(item_ids) == 1 else {"item_ids": item_ids}
+            await self._record_history(conn, telegram_user_id, action_type, payload)
             await conn.commit()
-            return item_id
+            return item_ids
         except Exception:
             await conn.rollback()
             raise
@@ -405,6 +424,13 @@ class NotesRepository:
             (reminder_id,),
         )
         await conn.commit()
+
+    async def delete_active_reminder_by_index(self, telegram_user_id: int, display_index: int) -> bool:
+        reminders = await self.get_active_reminders(telegram_user_id)
+        if display_index < 1 or display_index > len(reminders):
+            return False
+        await self.delete_reminder(reminders[display_index - 1].id)
+        return True
 
     async def undo_last(self, telegram_user_id: int) -> bool:
         conn = self.database.require_connection()
@@ -1030,6 +1056,14 @@ class NotesRepository:
             if row is not None:
                 await conn.execute("DELETE FROM items WHERE id = ?", (row["id"],))
                 await self._remove_item_position(conn, row["chapter_id"], row["is_done"], row["position"])
+            return
+
+        if action_type == "bulk_create_items":
+            for item_id in reversed(payload["item_ids"]):
+                row = await self._fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
+                if row is not None:
+                    await conn.execute("DELETE FROM items WHERE id = ?", (row["id"],))
+                    await self._remove_item_position(conn, row["chapter_id"], row["is_done"], row["position"])
             return
 
         if action_type == "delete_item":

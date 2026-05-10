@@ -5,6 +5,7 @@ from app.features.notes.actions import (
     ADD_INBOX_ITEM,
     ADD_ITEM,
     CREATE_CHAPTER,
+    DELETE_PUSH,
     DELETE,
     MARK_DONE,
     MOVE_DOWN,
@@ -35,7 +36,7 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
         return
 
     if action.kind == ADD_ITEM and action.text:
-        await repo.add_item(telegram_user_id, action.path, action.text)
+        await repo.add_items(telegram_user_id, action.path, _split_item_lines(action.text))
         return
 
     if action.kind == ADD_INBOX_ITEM and action.text:
@@ -56,3 +57,12 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
 
     if action.kind == RENAME and action.text:
         await repo.rename_chapter(telegram_user_id, action.path, action.text)
+        return
+
+    if action.kind == DELETE_PUSH and action.item_index is not None:
+        await repo.delete_active_reminder_by_index(telegram_user_id, action.item_index)
+        return
+
+
+def _split_item_lines(text: str) -> tuple[str, ...]:
+    return tuple(line.strip() for line in text.splitlines() if line.strip())

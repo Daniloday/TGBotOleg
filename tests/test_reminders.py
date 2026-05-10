@@ -25,6 +25,36 @@ class RemindersTest(unittest.TestCase):
         assert reminder is not None
         self.assertEqual(reminder.remind_at, datetime(2026, 5, 11, 12, 56, tzinfo=ZoneInfo("Europe/Kiev")))
 
+    def test_accepts_dot_time_separator(self) -> None:
+        now = datetime(2026, 5, 10, 10, 0, tzinfo=ZoneInfo("Europe/Kiev"))
+
+        reminder = parse_reminder_text("Call Alex 13.15", now)
+
+        self.assertIsNotNone(reminder)
+        assert reminder is not None
+        self.assertEqual(reminder.text, "Call Alex")
+        self.assertEqual(reminder.remind_at, datetime(2026, 5, 10, 13, 15, tzinfo=ZoneInfo("Europe/Kiev")))
+
+    def test_dot_date_and_dot_time(self) -> None:
+        now = datetime(2026, 5, 10, 15, 0, tzinfo=ZoneInfo("Europe/Kiev"))
+
+        reminder = parse_reminder_text("Call Alex 4.05 13.15", now)
+
+        self.assertIsNotNone(reminder)
+        assert reminder is not None
+        self.assertEqual(reminder.text, "Call Alex")
+        self.assertEqual(reminder.remind_at, datetime(2027, 5, 4, 13, 15, tzinfo=ZoneInfo("Europe/Kiev")))
+
+    def test_single_date_like_dot_value_is_time(self) -> None:
+        now = datetime(2026, 5, 10, 3, 0, tzinfo=ZoneInfo("Europe/Kiev"))
+
+        reminder = parse_reminder_text("Call Alex 4.05", now)
+
+        self.assertIsNotNone(reminder)
+        assert reminder is not None
+        self.assertEqual(reminder.text, "Call Alex")
+        self.assertEqual(reminder.remind_at, datetime(2026, 5, 10, 4, 5, tzinfo=ZoneInfo("Europe/Kiev")))
+
     def test_schedules_for_next_year_when_specific_date_has_passed(self) -> None:
         now = datetime(2026, 5, 10, 15, 0, tzinfo=ZoneInfo("Europe/Kiev"))
 

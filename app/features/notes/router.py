@@ -8,9 +8,9 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.db.repo.notes import NotesRepository
-from app.features.notes.actions import ADD_INBOX_ITEM, SHOW_PUSHES
+from app.features.notes.actions import ADD_INBOX_ITEM, DELETE_PUSH, SHOW_PUSHES
 from app.features.notes.parser import parse_user_text
-from app.features.notes.reminders import parse_reminder_text
+from app.features.notes.reminders import KYIV_TZ, parse_reminder_text
 from app.features.notes.rendering import render_current_state
 from app.features.notes.service import apply_note_action
 
@@ -35,8 +35,14 @@ def create_notes_router(repo: NotesRepository) -> Router:
             await _send_active_pushes(message, repo, telegram_user_id)
             return
 
+        if action.kind == DELETE_PUSH and action.item_index is not None:
+            await repo.delete_active_reminder_by_index(telegram_user_id, action.item_index)
+            await _delete_user_message(message)
+            await _send_active_pushes(message, repo, telegram_user_id)
+            return
+
         if action.kind == ADD_INBOX_ITEM and action.text:
-            parsed_reminder = parse_reminder_text(action.text, datetime.now().astimezone())
+            parsed_reminder = parse_reminder_text(action.text, datetime.now(KYIV_TZ))
             if parsed_reminder is not None:
                 await repo.create_reminder(
                     telegram_user_id,
@@ -83,7 +89,7 @@ async def _send_active_pushes(
     if reminders:
         lines = ["<b>Активные пуши</b>"]
         for index, reminder in enumerate(reminders, start=1):
-            when = reminder.remind_at.astimezone().strftime("%d.%m %H:%M")
+            when = reminder.remind_at.astimezone(KYIV_TZ).strftime("%d.%m %H:%M")
             lines.append(f"{index}. {when} - {reminder.text}")
         text = "\n".join(lines)
     else:

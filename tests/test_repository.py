@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.db.database import Database
@@ -163,6 +164,29 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(item_id)
         self.assertEqual(snapshot[0].items, [])
         self.assertEqual(snapshot[0].children[0].items, [])
+
+    async def test_bulk_add_items_and_undo_as_one_action(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+
+        item_ids = await self.repo.add_items(self.user_id, (1,), ("Books", "Notebooks"))
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertEqual(len(item_ids), 2)
+        self.assertEqual([item.text for item in snapshot[0].items], ["Books", "Notebooks"])
+
+        await self.repo.undo_last(self.user_id)
+        snapshot = await self.repo.get_snapshot(self.user_id)
+        self.assertEqual(snapshot[0].items, [])
+
+    async def test_delete_active_reminder_by_display_index(self) -> None:
+        await self.repo.create_reminder(self.user_id, 10, "First", datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc))
+        await self.repo.create_reminder(self.user_id, 10, "Second", datetime(2026, 5, 10, 11, 0, tzinfo=timezone.utc))
+
+        deleted = await self.repo.delete_active_reminder_by_index(self.user_id, 2)
+        reminders = await self.repo.get_active_reminders(self.user_id)
+
+        self.assertTrue(deleted)
+        self.assertEqual([reminder.text for reminder in reminders], ["First"])
 
     async def test_undo_subchapter_creation_restores_moved_items(self) -> None:
         await self.repo.create_chapter(self.user_id, "Buy")

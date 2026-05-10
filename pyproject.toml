@@ -11,9 +11,9 @@ dependencies = [
     "aiogram>=3,<4",
     "aiosqlite>=0.19,<1",
     "python-dotenv>=1,<2",
+    "tzdata>=2024.1,<2027",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
-

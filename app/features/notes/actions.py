@@ -15,6 +15,7 @@ MOVE_DOWN = "move_down"
 RENAME = "rename"
 UNDO = "undo"
 SHOW_PUSHES = "show_pushes"
+DELETE_PUSH = "delete_push"
 
 
 @dataclass(frozen=True)
