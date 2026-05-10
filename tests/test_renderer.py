@@ -17,7 +17,7 @@ class RendererTest(unittest.TestCase):
         )
 
         self.assertEqual([section.key for section in sections], ["chapter:c1", "chapter:c2"])
-        self.assertEqual([section.text for section in sections], ["<b>1. Buy</b>", "<b>2. Read</b>"])
+        self.assertEqual([section.text for section in sections], ["<b>Buy (1)</b>", "<b>Read (2)</b>"])
 
     def test_subchapter_uses_local_numbering_with_indent(self) -> None:
         sections = render_sections(
@@ -40,9 +40,8 @@ class RendererTest(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(sections[0].text, "<b>1. Buy</b>\n  <b>1. Food</b>\n    1. Milk")
+        self.assertEqual(sections[0].text, "<b>Buy (1)</b>\n  <b>Food (1)</b>\n    1. Milk")
 
 
 if __name__ == "__main__":
     unittest.main()
-

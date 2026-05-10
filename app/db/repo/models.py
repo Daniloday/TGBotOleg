@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List, Optional
 
 
@@ -21,3 +22,11 @@ class ChapterView:
     items: List[ItemView] = field(default_factory=list)
     children: List["ChapterView"] = field(default_factory=list)
 
+
+@dataclass(frozen=True)
+class ReminderView:
+    id: str
+    telegram_user_id: int
+    chat_id: int
+    text: str
+    remind_at: datetime

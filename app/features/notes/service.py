@@ -7,8 +7,11 @@ from app.features.notes.actions import (
     CREATE_CHAPTER,
     DELETE,
     MARK_DONE,
+    MOVE_DOWN,
+    MOVE_UP,
     RENAME,
     SHOW,
+    SHOW_PUSHES,
     UNDO,
     NoteAction,
 )
@@ -23,6 +26,10 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
         await repo.undo_last(telegram_user_id)
         return
 
+    if action.kind == SHOW_PUSHES:
+        await repo.ensure_user(telegram_user_id)
+        return
+
     if action.kind == CREATE_CHAPTER and action.text:
         await repo.create_chapter(telegram_user_id, action.text, action.path or None)
         return
@@ -35,14 +42,17 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
         await repo.add_inbox_item(telegram_user_id, action.text)
         return
 
-    if action.kind == MARK_DONE and action.item_index is not None:
-        await repo.mark_done(telegram_user_id, action.path, action.item_index)
+    if action.kind == MARK_DONE and action.item_indexes:
+        await repo.mark_done_many(telegram_user_id, action.path, action.item_indexes)
         return
 
-    if action.kind == DELETE:
-        await repo.delete_by_path(telegram_user_id, action.path)
+    if action.kind == DELETE and action.item_indexes:
+        await repo.delete_items(telegram_user_id, action.path, action.item_indexes)
+        return
+
+    if action.kind in {MOVE_UP, MOVE_DOWN}:
+        await repo.move_path(telegram_user_id, action.path, to_top=action.kind == MOVE_UP)
         return
 
     if action.kind == RENAME and action.text:
         await repo.rename_chapter(telegram_user_id, action.path, action.text)
-

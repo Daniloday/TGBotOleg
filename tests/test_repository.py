@@ -50,6 +50,16 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([chapter.title for chapter in my_snapshot], ["Mine"])
         self.assertEqual([chapter.title for chapter in other_snapshot], ["Other"])
 
+    async def test_inbox_is_last_when_chapters_exist(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        await self.repo.add_inbox_item(self.user_id, "Loose")
+
+        snapshot = await self.repo.get_snapshot(self.user_id)
+
+        self.assertEqual([chapter.title for chapter in snapshot], ["Buy", "Inbox"])
+        self.assertFalse(snapshot[0].is_inbox)
+        self.assertTrue(snapshot[1].is_inbox)
+
     async def test_done_item_moves_to_bottom(self) -> None:
         await self.repo.create_chapter(self.user_id, "Buy")
         await self.repo.add_item(self.user_id, (1,), "Milk")
@@ -64,6 +74,60 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
             (2, "Eggs", False),
             (3, "Milk", True),
         ])
+
+    async def test_bulk_done_uses_original_indexes_and_undoes_as_one_action(self) -> None:
+        await self.repo.create_chapter(self.user_id, "Buy")
+        for text in ["One", "Two", "Three", "Four"]:
+            await self.repo.add_item(self.user_id, (1,), text)
+
+        await self.repo.mark_done_many(self.user_id, (1,), (2, 3))
+        items = (await self.repo.get_snapshot(self.user_id))[0].items
+
+        self.assertEqual([(item.text, item.is_done) for item in items], [
+            ("One", False),
+            ("Four", False),
+            ("Two", True),
+            ("Three", True),
+        ])
+
+        await self.repo.undo_last(self.user_id)
+        items = (await self.repo.get_snapshot(self.user_id))[0].items
+        self.assertEqual([(item.text, item.is_done) for item in items], [
+            ("One", False),
+            ("Two", False),
+            ("Three", False),
+            ("Four", False),
+        ])
+
+    async def test_bulk_delete_uses_original_indexes_and_undoes_as_one_action(self) -> None:
+        await self.repo.add_inbox_item(self.user_id, "One")
+        await self.repo.add_inbox_item(self.user_id, "Two")
+        await self.repo.add_inbox_item(self.user_id, "Three")
+        await self.repo.add_inbox_item(self.user_id, "Four")
+
+        await self.repo.delete_items(self.user_id, (), (2, 3))
+        items = (await self.repo.get_snapshot(self.user_id))[0].items
+        self.assertEqual([item.text for item in items], ["One", "Four"])
+
+        await self.repo.undo_last(self.user_id)
+        items = (await self.repo.get_snapshot(self.user_id))[0].items
+        self.assertEqual([item.text for item in items], ["One", "Two", "Three", "Four"])
+
+    async def test_move_chapter_and_item_to_edges(self) -> None:
+        await self.repo.create_chapter(self.user_id, "One")
+        await self.repo.create_chapter(self.user_id, "Two")
+        await self.repo.create_chapter(self.user_id, "Three")
+
+        await self.repo.move_path(self.user_id, (3,), to_top=True)
+        self.assertEqual([chapter.title for chapter in await self.repo.get_snapshot(self.user_id)], ["Three", "One", "Two"])
+
+        await self.repo.add_item(self.user_id, (1,), "A")
+        await self.repo.add_item(self.user_id, (1,), "B")
+        await self.repo.add_item(self.user_id, (1,), "C")
+        await self.repo.move_path(self.user_id, (1, 1), to_top=False)
+        items = (await self.repo.get_snapshot(self.user_id))[0].items
+
+        self.assertEqual([item.text for item in items], ["B", "C", "A"])
 
     async def test_inbox_done_and_delete_use_zero_chapter_index(self) -> None:
         await self.repo.add_inbox_item(self.user_id, "One")

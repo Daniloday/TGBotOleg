@@ -10,8 +10,11 @@ ADD_ITEM = "add_item"
 ADD_INBOX_ITEM = "add_inbox_item"
 MARK_DONE = "mark_done"
 DELETE = "delete"
+MOVE_UP = "move_up"
+MOVE_DOWN = "move_down"
 RENAME = "rename"
 UNDO = "undo"
+SHOW_PUSHES = "show_pushes"
 
 
 @dataclass(frozen=True)
@@ -20,4 +23,4 @@ class NoteAction:
     text: Optional[str] = None
     path: Tuple[int, ...] = ()
     item_index: Optional[int] = None
-
+    item_indexes: Tuple[int, ...] = ()

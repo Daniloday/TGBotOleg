@@ -6,7 +6,10 @@ from app.features.notes.actions import (
     CREATE_CHAPTER,
     DELETE,
     MARK_DONE,
+    MOVE_DOWN,
+    MOVE_UP,
     RENAME,
+    SHOW_PUSHES,
     UNDO,
 )
 from app.features.notes.parser import parse_user_text
@@ -14,43 +17,85 @@ from app.features.notes.parser import parse_user_text
 
 class ParserTest(unittest.TestCase):
     def test_minus_without_space_is_plain_inbox_note(self) -> None:
-        action = parse_user_text("-2 kg за неделю")
+        action = parse_user_text("-2 kg per week")
 
         self.assertEqual(action.kind, ADD_INBOX_ITEM)
-        self.assertEqual(action.text, "-2 kg за неделю")
+        self.assertEqual(action.text, "-2 kg per week")
 
-    def test_dash_done_action(self) -> None:
-        action = parse_user_text("- 7 2")
-
-        self.assertEqual(action.kind, MARK_DONE)
-        self.assertEqual(action.path, (7,))
-        self.assertEqual(action.item_index, 2)
-
-    def test_dash_done_inbox_action(self) -> None:
-        action = parse_user_text("- 2")
+    def test_plain_number_marks_inbox_item_done(self) -> None:
+        action = parse_user_text("6")
 
         self.assertEqual(action.kind, MARK_DONE)
         self.assertEqual(action.path, ())
-        self.assertEqual(action.item_index, 2)
+        self.assertEqual(action.item_indexes, (6,))
 
-    def test_bullet_done_action(self) -> None:
-        action = parse_user_text("• 7 2")
+    def test_zero_number_marks_inbox_item_done(self) -> None:
+        action = parse_user_text("0 6")
+
+        self.assertEqual(action.kind, MARK_DONE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_indexes, (6,))
+
+    def test_plain_range_marks_inbox_items_done(self) -> None:
+        action = parse_user_text("2-6")
+
+        self.assertEqual(action.kind, MARK_DONE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_indexes, (2, 3, 4, 5, 6))
+
+    def test_chapter_item_done_action(self) -> None:
+        action = parse_user_text("7 2")
 
         self.assertEqual(action.kind, MARK_DONE)
         self.assertEqual(action.path, (7,))
-        self.assertEqual(action.item_index, 2)
+        self.assertEqual(action.item_indexes, (2,))
 
-    def test_del_action(self) -> None:
+    def test_chapter_item_range_done_action(self) -> None:
+        action = parse_user_text("7 2-4")
+
+        self.assertEqual(action.kind, MARK_DONE)
+        self.assertEqual(action.path, (7,))
+        self.assertEqual(action.item_indexes, (2, 3, 4))
+
+    def test_dash_delete_action(self) -> None:
+        action = parse_user_text("- 7 2")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, (7,))
+        self.assertEqual(action.item_indexes, (2,))
+
+    def test_bullet_delete_action(self) -> None:
+        action = parse_user_text("• 7 2-3")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, (7,))
+        self.assertEqual(action.item_indexes, (2, 3))
+
+    def test_delete_inbox_action(self) -> None:
+        action = parse_user_text("- 0 1")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_indexes, (1,))
+
+    def test_del_is_no_longer_command(self) -> None:
         action = parse_user_text("/del 7 2")
 
-        self.assertEqual(action.kind, DELETE)
-        self.assertEqual(action.path, (7, 2))
+        self.assertEqual(action.kind, ADD_INBOX_ITEM)
 
-    def test_del_inbox_action(self) -> None:
-        action = parse_user_text("/del 0 1")
+    def test_move_up_and_down(self) -> None:
+        up = parse_user_text("/up 7 2")
+        down = parse_user_text("/down 7 2 3")
 
-        self.assertEqual(action.kind, DELETE)
-        self.assertEqual(action.path, (0, 1))
+        self.assertEqual(up.kind, MOVE_UP)
+        self.assertEqual(up.path, (7, 2))
+        self.assertEqual(down.kind, MOVE_DOWN)
+        self.assertEqual(down.path, (7, 2, 3))
+
+    def test_show_pushes(self) -> None:
+        action = parse_user_text("/push")
+
+        self.assertEqual(action.kind, SHOW_PUSHES)
 
     def test_create_top_chapter(self) -> None:
         action = parse_user_text("+ Buy")
@@ -81,11 +126,11 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(action.text, "Pills")
 
     def test_rename_subchapter(self) -> None:
-        action = parse_user_text("/rename 3 1 NewApteka")
+        action = parse_user_text("/rename 3 1 NewBuy")
 
         self.assertEqual(action.kind, RENAME)
         self.assertEqual(action.path, (3, 1))
-        self.assertEqual(action.text, "NewApteka")
+        self.assertEqual(action.text, "NewBuy")
 
     def test_undo(self) -> None:
         action = parse_user_text("/undo")
