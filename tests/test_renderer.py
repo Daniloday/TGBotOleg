@@ -42,6 +42,24 @@ class RendererTest(unittest.TestCase):
 
         self.assertEqual(sections[0].text, "<b>Buy (1)</b>\n\n  <b>Food (1)</b>\n    1. Milk")
 
+    def test_each_subchapter_gets_separating_blank_line(self) -> None:
+        sections = render_sections(
+            [
+                ChapterView(
+                    id="c1",
+                    display_index=1,
+                    title="Buy",
+                    is_inbox=False,
+                    children=[
+                        ChapterView(id="c2", display_index=1, title="Food", is_inbox=False),
+                        ChapterView(id="c3", display_index=2, title="Home", is_inbox=False),
+                    ],
+                )
+            ]
+        )
+
+        self.assertEqual(sections[0].text, "<b>Buy (1)</b>\n\n  <b>Food (1)</b>\n\n  <b>Home (2)</b>")
+
 
 if __name__ == "__main__":
     unittest.main()

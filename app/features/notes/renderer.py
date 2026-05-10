@@ -41,10 +41,8 @@ def _render_chapter(lines: List[str], chapter: ChapterView, indent: str) -> None
     for item in chapter.items:
         lines.append(_render_item(item, indent + "  "))
 
-    if chapter.children:
-        lines.append("")
-
     for child in chapter.children:
+        lines.append("")
         _render_chapter(lines, child, indent=indent + "  ")
 
 
