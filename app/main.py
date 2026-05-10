@@ -12,6 +12,7 @@ from app.core.config import load_settings
 from app.db.database import Database
 from app.db.repo.notes import NotesRepository
 from app.features.notes.router import create_notes_router
+from app.services.notifications import run_notifications_worker
 from app.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,20 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    repo = NotesRepository(database)
     dispatcher = Dispatcher()
-    dispatcher.include_router(create_notes_router(NotesRepository(database)))
+    dispatcher.include_router(create_notes_router(repo))
+    notifications_task = asyncio.create_task(run_notifications_worker(bot, repo))
 
     try:
         logger.info("Starting polling.")
         await dispatcher.start_polling(bot)
     finally:
+        notifications_task.cancel()
+        try:
+            await notifications_task
+        except asyncio.CancelledError:
+            pass
         await bot.session.close()
         await database.close()
 
@@ -46,4 +54,3 @@ if __name__ == "__main__":
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from exc
-

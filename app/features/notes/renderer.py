@@ -36,7 +36,7 @@ def _render_chapter(lines: List[str], chapter: ChapterView, indent: str) -> None
     if chapter.is_inbox:
         lines.append(f"{indent}<b>{title}</b>")
     else:
-        lines.append(f"{indent}<b>{chapter.display_index}. {title}</b>")
+        lines.append(f"{indent}<b>{title} ({chapter.display_index})</b>")
 
     for item in chapter.items:
         lines.append(_render_item(item, indent + "  "))

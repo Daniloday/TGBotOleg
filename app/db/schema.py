@@ -49,6 +49,19 @@ CREATE TABLE IF NOT EXISTS operation_history (
     FOREIGN KEY (telegram_user_id) REFERENCES users (telegram_user_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS reminders (
+    id TEXT PRIMARY KEY,
+    telegram_user_id INTEGER NOT NULL,
+    chat_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    remind_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    sent_message_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (telegram_user_id) REFERENCES users (telegram_user_id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_chapters_user_parent_position
     ON chapters (telegram_user_id, parent_id, position);
 CREATE INDEX IF NOT EXISTS idx_chapters_user_inbox
@@ -57,4 +70,8 @@ CREATE INDEX IF NOT EXISTS idx_items_chapter_done_position
     ON items (chapter_id, is_done, position);
 CREATE INDEX IF NOT EXISTS idx_history_user_id
     ON operation_history (telegram_user_id, id);
+CREATE INDEX IF NOT EXISTS idx_reminders_status_time
+    ON reminders (status, remind_at);
+CREATE INDEX IF NOT EXISTS idx_reminders_user_status_time
+    ON reminders (telegram_user_id, status, remind_at);
 """
