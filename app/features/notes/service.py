@@ -64,8 +64,8 @@ async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action
         await repo.rename_chapter(telegram_user_id, action.path, action.text)
         return
 
-    if action.kind == DELETE_PUSH and action.item_index is not None:
-        await repo.delete_active_reminder_by_index(telegram_user_id, action.item_index)
+    if action.kind == DELETE_PUSH and action.item_indexes:
+        await repo.delete_active_reminders_by_indexes(telegram_user_id, action.item_indexes)
         return
 
 

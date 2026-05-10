@@ -115,7 +115,13 @@ class ParserTest(unittest.TestCase):
         action = parse_user_text("/pushdel 5")
 
         self.assertEqual(action.kind, DELETE_PUSH)
-        self.assertEqual(action.item_index, 5)
+        self.assertEqual(action.item_indexes, (5,))
+
+    def test_delete_push_range_by_display_indexes(self) -> None:
+        action = parse_user_text("/pushdel 3-6")
+
+        self.assertEqual(action.kind, DELETE_PUSH)
+        self.assertEqual(action.item_indexes, (3, 4, 5, 6))
 
     def test_create_top_chapter(self) -> None:
         action = parse_user_text("+ Buy")

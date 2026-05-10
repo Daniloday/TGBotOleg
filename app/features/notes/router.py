@@ -35,8 +35,8 @@ def create_notes_router(repo: NotesRepository) -> Router:
             await _send_active_pushes(message, repo, telegram_user_id)
             return
 
-        if action.kind == DELETE_PUSH and action.item_index is not None:
-            await repo.delete_active_reminder_by_index(telegram_user_id, action.item_index)
+        if action.kind == DELETE_PUSH and action.item_indexes:
+            await repo.delete_active_reminders_by_indexes(telegram_user_id, action.item_indexes)
             await _delete_user_message(message)
             await _send_active_pushes(message, repo, telegram_user_id)
             return

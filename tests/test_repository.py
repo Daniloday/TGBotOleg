@@ -215,6 +215,18 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(deleted)
         self.assertEqual([reminder.text for reminder in reminders], ["First"])
 
+    async def test_delete_active_reminders_by_display_index_range(self) -> None:
+        await self.repo.create_reminder(self.user_id, 10, "First", datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc))
+        await self.repo.create_reminder(self.user_id, 10, "Second", datetime(2026, 5, 10, 11, 0, tzinfo=timezone.utc))
+        await self.repo.create_reminder(self.user_id, 10, "Third", datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc))
+        await self.repo.create_reminder(self.user_id, 10, "Fourth", datetime(2026, 5, 10, 13, 0, tzinfo=timezone.utc))
+
+        deleted = await self.repo.delete_active_reminders_by_indexes(self.user_id, (2, 3))
+        reminders = await self.repo.get_active_reminders(self.user_id)
+
+        self.assertTrue(deleted)
+        self.assertEqual([reminder.text for reminder in reminders], ["First", "Fourth"])
+
     async def test_undo_subchapter_creation_restores_moved_items(self) -> None:
         await self.repo.create_chapter(self.user_id, "Buy")
         await self.repo.add_item(self.user_id, (1,), "Milk")

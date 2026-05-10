@@ -450,10 +450,27 @@ class NotesRepository:
         await conn.commit()
 
     async def delete_active_reminder_by_index(self, telegram_user_id: int, display_index: int) -> bool:
+        return await self.delete_active_reminders_by_indexes(telegram_user_id, (display_index,))
+
+    async def delete_active_reminders_by_indexes(
+        self,
+        telegram_user_id: int,
+        display_indexes: Sequence[int],
+    ) -> bool:
         reminders = await self.get_active_reminders(telegram_user_id)
-        if display_index < 1 or display_index > len(reminders):
+        reminder_ids = []
+        seen = set()
+        for display_index in display_indexes:
+            if display_index < 1 or display_index > len(reminders):
+                continue
+            reminder_id = reminders[display_index - 1].id
+            if reminder_id not in seen:
+                reminder_ids.append(reminder_id)
+                seen.add(reminder_id)
+        if not reminder_ids:
             return False
-        await self.delete_reminder(reminders[display_index - 1].id)
+        for reminder_id in reminder_ids:
+            await self.delete_reminder(reminder_id)
         return True
 
     async def undo_last(self, telegram_user_id: int) -> bool:

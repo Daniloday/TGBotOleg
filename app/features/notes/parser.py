@@ -27,7 +27,7 @@ DONE_RE = re.compile(r"^\d+(?:-\d+)?(?:\s+\d+(?:-\d+)?){0,2}$")
 MOVE_RE = re.compile(r"^/(up|down)\s+(\d+(?:\s+\d+){0,2})\s*$")
 RM_RE = re.compile(r"^/rm\s+(\d+(?:\s+\d+)?)\s*$")
 RENAME_RE = re.compile(r"^/rename\s+(\d+(?:\s+\d+)?)\s+(.+)$")
-PUSHDEL_RE = re.compile(r"^/pushdel\s+(\d+)\s*$")
+PUSHDEL_RE = re.compile(r"^/pushdel\s+(\d+(?:-\d+)?)\s*$")
 
 
 def parse_user_text(raw_text: str) -> NoteAction:
@@ -46,7 +46,7 @@ def parse_user_text(raw_text: str) -> NoteAction:
 
     match = PUSHDEL_RE.match(text)
     if match:
-        return NoteAction(kind=DELETE_PUSH, item_index=int(match.group(1)))
+        return NoteAction(kind=DELETE_PUSH, item_indexes=_parse_index_part(match.group(1)))
 
     match = MOVE_RE.match(text)
     if match:
