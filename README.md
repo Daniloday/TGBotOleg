@@ -15,7 +15,6 @@ This project was fully written with OpenAI Codex.
 - Timed reminders parsed from natural note text, using Kyiv timezone.
 - Telegram message rendering with HTML formatting and stable per-chat render locking.
 - Reminder delivery worker with inline delete buttons.
-- SQLite persistence with undo support for core note operations.
 
 ## Tech Stack
 
