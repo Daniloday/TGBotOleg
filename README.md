@@ -24,11 +24,8 @@ This project was fully written with OpenAI Codex.
 - SQLite
 - aiosqlite
 - python-dotenv
-- zoneinfo/tzdata for timezone handling
-- Docker
 - Docker Compose
 - GitHub Actions CI/CD
-- VPS deployment over SSH
 
 ## Project Structure
 
@@ -47,79 +44,5 @@ Dockerfile                   # Bot image
 docker-compose.yml           # VPS runtime setup
 ```
 
-## Local Setup
 
-Create `.env`:
 
-```env
-BOT_TOKEN=your_telegram_bot_token
-DATABASE_PATH=data/bot.sqlite3
-```
-
-Run locally:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m app.main
-```
-
-Run tests:
-
-```bash
-python -m unittest discover -s tests
-```
-
-## Docker
-
-Build and run with Docker Compose:
-
-```bash
-docker compose up -d --build
-```
-
-The SQLite database is stored under `./data` and mounted into the container at `/app/data`.
-
-Logs are written to stdout/stderr and can be viewed with:
-
-```bash
-docker compose logs -f bot
-```
-
-## Deployment
-
-Production deployment is handled by GitHub Actions.
-
-The workflow is triggered by annotated version tags that start with `v`, for example `v1.2.0`. Before deploying, the workflow verifies that the tagged commit belongs to `origin/prod`.
-
-Release flow:
-
-```bash
-git checkout prod
-git merge dev --ff-only
-git push origin prod
-
-git tag -a v1.2.0 -m "Release v1.2.0"
-git push origin v1.2.0
-```
-
-The GitHub Action then:
-
-- checks that the tag is on `prod`;
-- builds a Docker test image;
-- runs the unit test suite inside Docker;
-- connects to the VPS over SSH;
-- fetches `prod`;
-- rebuilds and restarts the service with Docker Compose.
-
-Required GitHub secrets:
-
-- `VPS_HOST`
-- `VPS_USER`
-- `VPS_SSH_KEY`
-- `VPS_DEPLOY_PATH`
-
-## Bot Link
-
-[Open @oleg_tododo_bot in Telegram](https://t.me/oleg_tododo_bot)
