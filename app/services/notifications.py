@@ -8,7 +8,6 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 
 from app.db.repo.notes import NotesRepository
-from app.features.notes.rendering import render_current_state
 from app.features.notes.router import delete_push_keyboard
 
 logger = logging.getLogger(__name__)
@@ -38,5 +37,3 @@ async def _send_due_reminders(bot: Bot, repo: NotesRepository) -> None:
             continue
 
         await repo.mark_reminder_sent(reminder.id, sent.message_id)
-        await repo.add_inbox_item(reminder.telegram_user_id, reminder.text)
-        await render_current_state(bot, repo, reminder.telegram_user_id, reminder.chat_id)

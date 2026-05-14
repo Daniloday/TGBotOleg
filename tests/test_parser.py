@@ -7,6 +7,7 @@ from app.features.notes.actions import (
     DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
+    IGNORE,
     MARK_DONE,
     MOVE_DOWN,
     MOVE_UP,
@@ -79,6 +80,20 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(action.path, (7,))
         self.assertEqual(action.item_indexes, (2, 3))
 
+    def test_dash_delete_action_without_space(self) -> None:
+        action = parse_user_text("-5")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_indexes, (5,))
+
+    def test_bullet_delete_action_without_space(self) -> None:
+        action = parse_user_text("•5")
+
+        self.assertEqual(action.kind, DELETE)
+        self.assertEqual(action.path, ())
+        self.assertEqual(action.item_indexes, (5,))
+
     def test_delete_inbox_action(self) -> None:
         action = parse_user_text("- 0 1")
 
@@ -89,7 +104,12 @@ class ParserTest(unittest.TestCase):
     def test_del_is_no_longer_command(self) -> None:
         action = parse_user_text("/del 7 2")
 
-        self.assertEqual(action.kind, ADD_INBOX_ITEM)
+        self.assertEqual(action.kind, IGNORE)
+
+    def test_unknown_command_is_ignored(self) -> None:
+        action = parse_user_text("/unknown")
+
+        self.assertEqual(action.kind, IGNORE)
 
     def test_remove_chapter_command(self) -> None:
         action = parse_user_text("/rm 7")

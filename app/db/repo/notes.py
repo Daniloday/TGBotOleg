@@ -439,6 +439,21 @@ class NotesRepository:
         )
         return [self._row_to_reminder(row) for row in rows]
 
+    async def get_reminder(self, reminder_id: str) -> Optional[ReminderView]:
+        conn = self.database.require_connection()
+        row = await self._fetchone(
+            conn,
+            """
+            SELECT *
+            FROM reminders
+            WHERE id = ?
+            """,
+            (reminder_id,),
+        )
+        if row is None:
+            return None
+        return self._row_to_reminder(row)
+
     async def mark_reminder_sent(self, reminder_id: str, message_id: int) -> None:
         conn = self.database.require_connection()
         await conn.execute(

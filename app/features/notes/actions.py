@@ -17,6 +17,7 @@ RENAME = "rename"
 UNDO = "undo"
 SHOW_PUSHES = "show_pushes"
 DELETE_PUSH = "delete_push"
+IGNORE = "ignore"
 
 
 @dataclass(frozen=True)

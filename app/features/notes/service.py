@@ -8,6 +8,7 @@ from app.features.notes.actions import (
     DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
+    IGNORE,
     MARK_DONE,
     MOVE_DOWN,
     MOVE_UP,
@@ -20,6 +21,9 @@ from app.features.notes.actions import (
 
 
 async def apply_note_action(repo: NotesRepository, telegram_user_id: int, action: NoteAction) -> None:
+    if action.kind == IGNORE:
+        return
+
     if action.kind == SHOW:
         await repo.ensure_user(telegram_user_id)
         return

@@ -7,8 +7,12 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 KYIV_TZ = ZoneInfo("Europe/Kiev")
-TIME_RE = re.compile(r"\b([01]?\d|2[0-3])([:.])([0-5]\d)\b")
-DATE_RE = re.compile(r"\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b")
+COLON_TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
+DOT_PAIR_RE = re.compile(r"\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b")
+SPACE_PAIR_RE = re.compile(r"(?<!\d)(\d{1,2})\s+(\d{1,2})(?!\d)")
+ESCAPED_PAIR_RE = re.compile(
+    r"\.(?=(?:[01]?\d|2[0-3]):[0-5]\d\b|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?\b|\d{1,2}\s+\d{1,2}(?!\d))"
+)
 
 
 @dataclass(frozen=True)
@@ -17,27 +21,35 @@ class ParsedReminder:
     remind_at: datetime
 
 
+@dataclass(frozen=True)
+class _DateTimeCandidate:
+    start: int
+    end: int
+    first: int
+    second: int
+    year_raw: Optional[str]
+    separator: str
+    can_time: bool
+    can_date: bool
+
+
 def parse_reminder_text(raw_text: str, now: datetime) -> Optional[ParsedReminder]:
     now = now.astimezone(KYIV_TZ)
-    date_match = _find_date(raw_text, now.year)
-    time_match = _find_time(raw_text, date_match)
-    if time_match is None and date_match is not None:
-        time_match = TIME_RE.search(raw_text)
-        date_match = None
-    if time_match is None:
+    date_candidate, time_candidate = _select_datetime(raw_text, now.year)
+    if time_candidate is None:
         return None
 
-    hour = int(time_match.group(1))
-    minute = int(time_match.group(3))
+    hour = time_candidate.first
+    minute = time_candidate.second
 
-    if date_match is None:
+    if date_candidate is None:
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if target <= now:
             target += timedelta(days=1)
     else:
-        day = int(date_match.group(1))
-        month = int(date_match.group(2))
-        year_raw = date_match.group(3)
+        day = date_candidate.first
+        month = date_candidate.second
+        year_raw = date_candidate.year_raw
         year = now.year if year_raw is None else _parse_year(year_raw)
         try:
             target = now.replace(year=year, month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
@@ -49,9 +61,8 @@ def parse_reminder_text(raw_text: str, now: datetime) -> Optional[ParsedReminder
             except ValueError:
                 return None
 
-    text = _remove_match(raw_text, time_match)
-    if date_match is not None:
-        text = _remove_match(text, DATE_RE.search(text))
+    text = _remove_spans(raw_text, _selected_spans(date_candidate, time_candidate))
+    text = _unescape_text_fragments(text)
     text = " ".join(text.split())
     if not text:
         return None
@@ -65,35 +76,126 @@ def _parse_year(value: str) -> int:
     return year
 
 
-def _find_date(raw_text: str, current_year: int) -> Optional[re.Match[str]]:
-    for match in DATE_RE.finditer(raw_text):
-        day = int(match.group(1))
-        month = int(match.group(2))
-        year_raw = match.group(3)
-        year = current_year if year_raw is None else _parse_year(year_raw)
-        try:
-            datetime(year, month, day)
-        except ValueError:
+def _select_datetime(raw_text: str, current_year: int) -> tuple[Optional[_DateTimeCandidate], Optional[_DateTimeCandidate]]:
+    candidates = _find_candidates(raw_text, current_year)
+    colon_time = next((candidate for candidate in candidates if candidate.separator == ":" and candidate.can_time), None)
+    if colon_time is not None:
+        date_candidate = next(
+            (
+                candidate
+                for candidate in candidates
+                if candidate.start < colon_time.start and candidate.separator != ":" and candidate.can_date
+            ),
+            None,
+        )
+        return date_candidate, colon_time
+
+    if len(candidates) == 1:
+        candidate = candidates[0]
+        return None, candidate if candidate.can_time else None
+
+    if len(candidates) >= 2:
+        first, second = candidates[0], candidates[1]
+        if first.can_date and second.can_time:
+            return first, second
+
+    time_candidate = next((candidate for candidate in candidates if candidate.can_time), None)
+    return None, time_candidate
+
+
+def _find_candidates(raw_text: str, current_year: int) -> list[_DateTimeCandidate]:
+    candidates = []
+    for match in COLON_TIME_RE.finditer(raw_text):
+        if _is_escaped(raw_text, match.start()):
             continue
-        return match
-    return None
+        candidates.append(
+            _DateTimeCandidate(
+                start=match.start(),
+                end=match.end(),
+                first=int(match.group(1)),
+                second=int(match.group(2)),
+                year_raw=None,
+                separator=":",
+                can_time=True,
+                can_date=False,
+            )
+        )
+
+    for match in DOT_PAIR_RE.finditer(raw_text):
+        if _is_escaped(raw_text, match.start()):
+            continue
+        first = int(match.group(1))
+        second = int(match.group(2))
+        year_raw = match.group(3)
+        candidates.append(
+            _DateTimeCandidate(
+                start=match.start(),
+                end=match.end(),
+                first=first,
+                second=second,
+                year_raw=year_raw,
+                separator=".",
+                can_time=year_raw is None and _is_valid_time(first, second),
+                can_date=_is_valid_date(first, second, year_raw, current_year),
+            )
+        )
+
+    for match in SPACE_PAIR_RE.finditer(raw_text):
+        if _is_escaped(raw_text, match.start()):
+            continue
+        first = int(match.group(1))
+        second = int(match.group(2))
+        candidates.append(
+            _DateTimeCandidate(
+                start=match.start(),
+                end=match.end(),
+                first=first,
+                second=second,
+                year_raw=None,
+                separator=" ",
+                can_time=_is_valid_time(first, second),
+                can_date=_is_valid_date(first, second, None, current_year),
+            )
+        )
+
+    valid_candidates = [candidate for candidate in candidates if candidate.can_time or candidate.can_date]
+    return sorted(valid_candidates, key=lambda candidate: candidate.start)
 
 
-def _find_time(raw_text: str, date_match: Optional[re.Match[str]]) -> Optional[re.Match[str]]:
-    matches = list(TIME_RE.finditer(raw_text))
-    if not matches:
-        return None
-
-    if date_match is None:
-        return matches[0]
-
-    for match in matches:
-        if match.span() != date_match.span():
-            return match
-    return None
+def _is_valid_time(hour: int, minute: int) -> bool:
+    return 0 <= hour <= 23 and 0 <= minute <= 59
 
 
-def _remove_match(text: str, match: Optional[re.Match[str]]) -> str:
-    if match is None:
-        return text
-    return f"{text[:match.start()]} {text[match.end():]}"
+def _is_valid_date(day: int, month: int, year_raw: Optional[str], current_year: int) -> bool:
+    year = current_year if year_raw is None else _parse_year(year_raw)
+    try:
+        datetime(year, month, day)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_escaped(text: str, start: int) -> bool:
+    return start > 0 and text[start - 1] == "."
+
+
+def _selected_spans(
+    date_candidate: Optional[_DateTimeCandidate],
+    time_candidate: Optional[_DateTimeCandidate],
+) -> list[tuple[int, int]]:
+    spans = []
+    for candidate in (date_candidate, time_candidate):
+        if candidate is not None:
+            spans.append((candidate.start, candidate.end))
+    return spans
+
+
+def _remove_spans(text: str, spans: list[tuple[int, int]]) -> str:
+    result = text
+    for start, end in sorted(spans, reverse=True):
+        result = f"{result[:start]} {result[end:]}"
+    return result
+
+
+def _unescape_text_fragments(text: str) -> str:
+    return ESCAPED_PAIR_RE.sub("", text)

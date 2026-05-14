@@ -238,6 +238,22 @@ class NotesRepositoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(deleted)
         self.assertEqual([reminder.text for reminder in reminders], ["First", "Fourth"])
 
+    async def test_get_reminder_returns_sent_reminder(self) -> None:
+        reminder_id = await self.repo.create_reminder(
+            self.user_id,
+            10,
+            "First",
+            datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc),
+        )
+
+        await self.repo.mark_reminder_sent(reminder_id, 99)
+        reminder = await self.repo.get_reminder(reminder_id)
+
+        self.assertIsNotNone(reminder)
+        assert reminder is not None
+        self.assertEqual(reminder.text, "First")
+        self.assertEqual(reminder.telegram_user_id, self.user_id)
+
     async def test_undo_subchapter_creation_restores_moved_items(self) -> None:
         await self.repo.create_chapter(self.user_id, "Buy")
         await self.repo.add_item(self.user_id, (1,), "Milk")

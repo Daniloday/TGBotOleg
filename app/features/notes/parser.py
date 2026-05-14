@@ -10,6 +10,7 @@ from app.features.notes.actions import (
     DELETE_CHAPTER,
     DELETE_PUSH,
     DELETE,
+    IGNORE,
     MARK_DONE,
     MOVE_DOWN,
     MOVE_UP,
@@ -22,7 +23,7 @@ from app.features.notes.actions import (
 
 CREATE_RE = re.compile(r"^\+\s+(?:(\d+)\s+)?(.+)$")
 ADD_RE = re.compile(r"^(\d+)(?:\s+(\d+))?\s+(.+)$")
-DELETE_RE = re.compile(r"^[-•]\s+(.+)$")
+DELETE_RE = re.compile(r"^[-•]\s*(\d+(?:-\d+)?(?:\s+\d+(?:-\d+)?){0,2})$")
 DONE_RE = re.compile(r"^\d+(?:-\d+)?(?:\s+\d+(?:-\d+)?){0,2}$")
 MOVE_RE = re.compile(r"^/(up|down)\s+(\d+(?:\s+\d+){0,2})\s*$")
 RM_RE = re.compile(r"^/rm\s+(\d+(?:\s+\d+)?)\s*$")
@@ -91,6 +92,9 @@ def parse_user_text(raw_text: str) -> NoteAction:
         if match.group(2) is not None:
             path = (path[0], int(match.group(2)))
         return NoteAction(kind=ADD_ITEM, path=path, text=match.group(3).strip())
+
+    if text.startswith("/"):
+        return NoteAction(kind=IGNORE)
 
     return NoteAction(kind=ADD_INBOX_ITEM, text=text)
 
