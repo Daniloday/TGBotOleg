@@ -34,7 +34,7 @@ def render_notes(chapters: Iterable[ChapterView]) -> str:
 def _render_chapter(lines: List[str], chapter: ChapterView, indent: str) -> None:
     title = escape(chapter.title)
     if chapter.is_inbox:
-        lines.append(f"{indent}<b>{title}</b>")
+        lines.append(f"{indent}<b>📥 {title}</b>")
     else:
         lines.append(f"{indent}<b>{title} ({chapter.display_index})</b>")
 

@@ -29,7 +29,7 @@ async def _send_due_reminders(bot: Bot, repo: NotesRepository) -> None:
         try:
             sent = await bot.send_message(
                 chat_id=reminder.chat_id,
-                text=reminder.text,
+                text=f"🔔 {reminder.text}",
                 reply_markup=delete_push_keyboard(reminder.id),
             )
         except (TelegramBadRequest, TelegramForbiddenError) as exc:

@@ -49,14 +49,18 @@ def create_notes_router(repo: NotesRepository) -> Router:
         if action.kind == ADD_INBOX_ITEM and action.text:
             parsed_reminder = parse_reminder_text(action.text, datetime.now(KYIV_TZ))
             if parsed_reminder is not None:
-                await repo.create_reminder(
+                reminder_id = await repo.create_reminder(
                     telegram_user_id,
                     message.chat.id,
                     parsed_reminder.text,
                     parsed_reminder.remind_at,
                 )
                 await _delete_user_message(message)
-                await _send_created_push_confirmation(message, parsed_reminder)
+                await _send_created_push_confirmation(
+                    message,
+                    parsed_reminder,
+                    reminder_id,
+                )
                 return
 
         await apply_note_action(repo, telegram_user_id, action)
@@ -111,21 +115,28 @@ async def _send_active_pushes(
 ) -> None:
     reminders = await repo.get_active_reminders(telegram_user_id)
     if reminders:
-        lines = ["<b>Активные пуши</b>"]
+        lines = ["<b>🔔 Активные пуши</b>"]
         for index, reminder in enumerate(reminders, start=1):
             when = reminder.remind_at.astimezone(KYIV_TZ).strftime("%d.%m %H:%M")
-            lines.append(f"{index}. {when} - {reminder.text}")
+            lines.append(f"{index}. 🔔 {when} - {reminder.text}")
         text = "\n".join(lines)
     else:
-        text = "Активных пушей нет"
+        text = "🔔 Активных пушей нет"
 
     await message.answer(text, reply_markup=close_keyboard())
 
 
-async def _send_created_push_confirmation(message: Message, reminder: ParsedReminder) -> None:
+async def _send_created_push_confirmation(
+    message: Message,
+    reminder: ParsedReminder,
+    reminder_id: str,
+) -> None:
     when = _format_reminder_at(reminder.remind_at)
-    sent = await message.answer(f"Пуш поставлен:\n{when} - {reminder.text}")
-    asyncio.create_task(_delete_message_later(sent, 10))
+    sent = await message.answer(
+        f"🔔 Пуш поставлен:\n{when} - {reminder.text}",
+        reply_markup=delete_push_keyboard(reminder_id),
+    )
+    asyncio.create_task(_delete_message_later(sent, 5))
 
 
 async def _delete_message_later(message: Message, delay_seconds: int) -> None:
@@ -146,8 +157,14 @@ def delete_push_keyboard(reminder_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="В инбокс", callback_data=f"push:inbox:{reminder_id}"),
-                InlineKeyboardButton(text="Удалить", callback_data=f"push:delete:{reminder_id}"),
+                InlineKeyboardButton(
+                    text="📥 В инбокс",
+                    callback_data=f"push:inbox:{reminder_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"push:delete:{reminder_id}",
+                ),
             ]
         ]
     )
@@ -156,7 +173,7 @@ def delete_push_keyboard(reminder_id: str) -> InlineKeyboardMarkup:
 def close_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Закрыть", callback_data="push:close")]
+            [InlineKeyboardButton(text="✖ Закрыть", callback_data="push:close")]
         ]
     )
 

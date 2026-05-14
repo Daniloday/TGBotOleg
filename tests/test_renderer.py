@@ -19,6 +19,23 @@ class RendererTest(unittest.TestCase):
         self.assertEqual([section.key for section in sections], ["chapter:c1", "chapter:c2"])
         self.assertEqual([section.text for section in sections], ["<b>Buy (1)</b>", "<b>Read (2)</b>"])
 
+    def test_inbox_title_has_icon(self) -> None:
+        sections = render_sections(
+            [
+                ChapterView(
+                    id="c1",
+                    display_index=0,
+                    title="Inbox",
+                    is_inbox=True,
+                    items=[
+                        ItemView(id="i1", display_index=1, text="Loose", is_done=False),
+                    ],
+                )
+            ]
+        )
+
+        self.assertEqual(sections[0].text, "<b>📥 Inbox</b>\n  1. Loose")
+
     def test_subchapter_uses_local_numbering_with_indent(self) -> None:
         sections = render_sections(
             [
