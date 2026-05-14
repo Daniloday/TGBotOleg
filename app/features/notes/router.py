@@ -118,7 +118,7 @@ async def _send_active_pushes(
         lines = ["<b>🔔 Активные пуши</b>"]
         for index, reminder in enumerate(reminders, start=1):
             when = reminder.remind_at.astimezone(KYIV_TZ).strftime("%d.%m %H:%M")
-            lines.append(f"{index}. 🔔 {when} - {reminder.text}")
+            lines.append(f"{index}. {when} - {reminder.text}")
         text = "\n".join(lines)
     else:
         text = "🔔 Активных пушей нет"
@@ -134,7 +134,7 @@ async def _send_created_push_confirmation(
     when = _format_reminder_at(reminder.remind_at)
     sent = await message.answer(
         f"🔔 Пуш поставлен:\n{when} - {reminder.text}",
-        reply_markup=delete_push_keyboard(reminder_id),
+        reply_markup=created_push_keyboard(reminder_id),
     )
     asyncio.create_task(_delete_message_later(sent, 5))
 
@@ -161,6 +161,19 @@ def delete_push_keyboard(reminder_id: str) -> InlineKeyboardMarkup:
                     text="📥 В инбокс",
                     callback_data=f"push:inbox:{reminder_id}",
                 ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"push:delete:{reminder_id}",
+                ),
+            ]
+        ]
+    )
+
+
+def created_push_keyboard(reminder_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
                 InlineKeyboardButton(
                     text="🗑 Удалить",
                     callback_data=f"push:delete:{reminder_id}",

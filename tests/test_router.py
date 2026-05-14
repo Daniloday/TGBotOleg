@@ -1,6 +1,10 @@
 import unittest
 
-from app.features.notes.router import close_keyboard, delete_push_keyboard
+from app.features.notes.router import (
+    close_keyboard,
+    created_push_keyboard,
+    delete_push_keyboard,
+)
 
 
 class RouterKeyboardTest(unittest.TestCase):
@@ -13,6 +17,13 @@ class RouterKeyboardTest(unittest.TestCase):
             [button.callback_data for button in buttons],
             ["push:inbox:p123", "push:delete:p123"],
         )
+
+    def test_created_push_keyboard_has_only_delete_button(self) -> None:
+        keyboard = created_push_keyboard("p123")
+
+        buttons = keyboard.inline_keyboard[0]
+        self.assertEqual([button.text for button in buttons], ["🗑 Удалить"])
+        self.assertEqual([button.callback_data for button in buttons], ["push:delete:p123"])
 
     def test_close_keyboard_has_icon_and_callback(self) -> None:
         keyboard = close_keyboard()
